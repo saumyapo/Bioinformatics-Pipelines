@@ -1,0 +1,135 @@
+names = expand("{tp}{rep}subsample_{reads}",
+        tp = ['AD','P0','P4','P7'],
+        rep = ['rep1','rep2'],
+        reads = ['R1','R2'])
+
+rule all:
+        input:
+                multiqc = 'results/multiqc_report.html',
+                stat = expand("results/samtools/{samples}_flagstat.txt", samples = names),
+                genome = "reference/GRCm39.primary_assembly.genome.fa.gz",
+                verse = 'results/verse/verse_concat_filtered.csv',
+                ensembl = 'results/id2gene.txt'
+
+rule fastqc:
+        input:
+                fastq = 'samples/{names}.fastq.gz',
+        output:
+                html = "results/fastqc/{names}_fastqc.html",
+                zip = "results/fastqc/{names}_fastqc.zip"
+        params:
+                outdir = 'results/fastqc'
+        shell:
+                '''
+                fastqc {input.fastq} -o {params.outdir}
+                '''
+
+rule multiqc:
+        input:
+                fastqc = expand("results/fastqc/{sample}_fastqc.zip", sample = names)
+        output:
+                multiqc = 'results/multiqc_report.html'
+        params:
+                outdir = 'results/'
+        shell:
+                '''
+                multiqc results/fastqc/ -o {params.outdir}
+                '''
+
+rule get_m39:
+        output:
+                genome = "reference/GRCm39.primary_assembly.genome.fa.gz"
+        params:
+                outdir = "reference/"
+        shell:
+                '''
+                wget "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M34/GRCm39.primary_assembly.genome.fa.gz" -P
+ {params.outdir}
+                '''
+
+rule get_m39_gtf:
+        output:
+                gtf = "reference/gencode.vM34.primary_assembly.annotation.gtf"
+        params:
+                outdir = "reference/"
+        shell:
+                '''
+                wget "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M34/gencode.vM34.primary_assembly.annotation.gtf.gz" -P {params.outdir}
+                gzip -d {params.outdir}/*gtf*
+                '''
+
+rule star:
+        input:
+                R1 = "samples/{names}_R1.fastq.gz",
+                R2 = "samples/{names}_R2.fastq.gz"
+        output:
+                bam = "results/star/{names}.Aligned.out.bam"
+        params:
+                index = "reference/m39_subset_star/",
+                outdir = "results/star"
+        shell:
+                '''
+                STAR --genomeDir {params.index} \
+                --readFilesIn {input.R1} {input.R2} \
+                --readFilesCommand zcat \
+                --quantMode GeneCounts \
+                --outSAMtype BAM Unsorted \
+                --outFileNamePrefix {params.outdir}/{wildcards.names}.
+                '''
+
+rule samtools_flagstat:
+        input:
+                bam = 'results/star/{names}.Aligned.out.bam'
+        output:
+                stat = 'results/samtools/{names}_flagstat.txt'
+        params:
+                outdir = "results/samtools"
+        shell:
+                '''
+                samtools flagstat {input.bam} > {params.outdir}/{wildcards.names}_flagstat.txt
+                '''
+
+rule verse:
+        input:
+                bam = 'results/star/{names}_Aligned.out.bam',
+                gtf = 'reference/gencode.vM34.primary_assembly.annotation.gtf',
+        output:
+                verse_exons = 'results/verse/{names}.exon.txt'
+        params:
+                prefix = 'results/verse/{names}'
+        shell:
+                '''
+                verse -S -a {input.gtf} -o {params.prefix} {input.bam}
+                '''
+
+rule concat_verse:
+        input:
+                mats = expand('results/verse/{samples}.exon.txt', samples=names)
+        output:
+                concat = 'results/verse/verse_concat.csv'
+        shell:
+                '''
+                python concat_df.py -i {input.mats} -o {output.concat}
+                '''
+
+rule filter_cts:
+        input:
+                verse = 'results/verse/verse_concat.csv'
+        output:
+                filtered = 'results/verse/verse_concat_filtered.csv'
+        shell:
+                '''
+                python filter_cts_mat.py -i {input.verse} -o {output.filtered}
+                '''
+
+rule txn_mapping:
+        input:
+                gtf = 'reference/gencode.vM34.primary_assembly.annotation.gtf'
+        output:
+                mapping = 'results/id2gene.txt'
+        shell:
+                '''
+                python parse_gtf.py -i {input.gtf} -o {output.mapping}
+                '''
+
+
