@@ -8,16 +8,17 @@ Each directory contains the Snakemake file for that respective workflow and also
 Where relevant there is an "images" directory present which holds the images generated during downstream analysis of the data.
 
 ### Links to relevant files can be found below:
-1. [RNASeq:](RNASeq)
-- [Methods and Results](RNASeq/RNASeq_Discussion.Rmd)
-2. [ChIPSeq:](/ChIPSeq)
-- [Methods and Results](ChIPSeq/ChIPSeq_Discussion.Rmd)
-- [Images obtained from downstream analysis](ChIPSeq/images)
+1. [Snakemake RNASeq:](Snakemake/RNASeq)
+- [Methods and Results](Snakemake/RNASeq/RNASeq_Discussion.Rmd)
+2. [Snakemake ChIPSeq:](Snakemake/ChIPSeq)
+- [Methods and Results](Snakemake/ChIPSeq/ChIPSeq_Discussion.Rmd)
+- [Images obtained from downstream analysis](Snakemake/ChIPSeq/images)
 
 
 ## Nextflow Pipelines
-<strong> Note: Nextflow pipelines of the same workflow were developed to additionally practice using Nextflow. Since the same methods and data were used, the results are identical. The links for the pipelines can be found below:</strong>
-1. [RNASeq](https://github.com/saumyapo/Nextflow/blob/fe14420bd0fb7950e446df1020833cf1dcf0398a/RNASeq.nf)
-2. [ChIPSeq](https://github.com/saumyapo/Nextflow/blob/fe14420bd0fb7950e446df1020833cf1dcf0398a/ChIPSeq.nf)
+The Nextflow pipelines were developed using the same workflow to additionally practice Groovy and are stored in `Nextflow`. Since the same methods and data were used, the results are identical. The links for the pipelines can be found below:
+1. [NF RNASeq](Nextflow/RNASeq.nf)
+2. [NF ChIPSeq](Nextflow/ChIPSeq.nf)
+
    
 
