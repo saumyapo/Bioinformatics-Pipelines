@@ -9,10 +9,10 @@ Where relevant there is an "images" directory present which holds the images gen
 
 ### Links to relevant files can be found below:
 1. [Snakemake RNASeq:](Snakemake/RNASeq)
-- [Methods and Results](Snakemake/RNASeq/RNASeq_Discussion.Rmd)
+   *  [Methods and Results](Snakemake/RNASeq/RNASeq_Discussion.Rmd)
 2. [Snakemake ChIPSeq:](Snakemake/ChIPSeq)
-- [Methods and Results](Snakemake/ChIPSeq/ChIPSeq_Discussion.Rmd)
-- [Images obtained from downstream analysis](Snakemake/ChIPSeq/images)
+   *  [Methods and Results](Snakemake/ChIPSeq/ChIPSeq_Discussion.Rmd)
+   *  [Images obtained from downstream analysis](Snakemake/ChIPSeq/images)
 
 
 ## Nextflow Pipelines
