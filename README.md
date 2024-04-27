@@ -7,7 +7,7 @@ The `Snakemake` directory has different Snakemake pipelines developed for differ
 Each directory contains the Snakemake file for that respective workflow and also a Discussion.Rmd which contains information about what references and methods were used to recreate the results via the pipeline and what the conclusions/learning outcomes were. The directory also includes other scripts written outside of Snakemake (using either Python or R) which were used for further analysis of the data.
 Where relevant there is an "images" directory present which holds the images generated during downstream analysis of the data.
 
-### Links to relevant files can be found below:
+### Links to Snakemake files
 1. [Snakemake RNASeq:](Snakemake/RNASeq)
    *  [Methods and Results](Snakemake/RNASeq/RNASeq_Discussion.Rmd)
 2. [Snakemake ChIPSeq:](Snakemake/ChIPSeq)
