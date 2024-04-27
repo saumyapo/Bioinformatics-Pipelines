@@ -1,0 +1,20 @@
+Methods:
+  1. Sample Data:
+  Initially RNAseq subsampled data was used (1000 reads subsampled from original files). For the final analysis the original raw fastq files were used (original GEO Dataset link: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE64403)
+  
+  2. RNAseq Analysis:
+  RNAseq data analysis was performed using a Snakemake (version 8.3.2) workflow. Initially, raw sequencing data quality was assessed using FastQC (version 0.12.1). Post that reads were aligned to the mouse reference genome (GRCm39) using STAR (version 2.7.11a), generating unsorted BAM files. SAMtools (version 1.19) was employed to obtain alignment statistics (flagstat).
+  
+  3. Gene Expression Count Generation:
+  The Gencode mouse genome annotation file (gencode.vM34.primary_assembly.annotation.gtf) was utilised as it provides essential information about gene features and structures. The gene expression counts were obtained using VERSE (version 0.1.5) tool, and differential expression analysis was conducted using standard statistical methods.
+  
+  4. Data Compilation:
+  MultiQC (version 1.17) was employed to aggregate quality control metrics from FastQC and generate a comprehensive report. Additionally, a Python script, concat_df.py, was utilised to concatenate the gene expression matrices obtained from VERSE into a single matrix. This script uses Pandas to read and concatenate the data from VERSE output filenames provided by Snakemake. Another custom Python script, parse_gtf.py, was used to parse the GTF file and map gene identifiers to human-readable gene names. This script employs regular expressions to extract gene names and identifiers from the GTF file and generates an output file containing the mapping. Laslty the last script filter_cts_mat.py script filtered the concatenated gene expression matrix to retain genes with nonzero counts across all samples. This step was crucial for ensuring data quality and reducing noise in subsequent analyses.
+  
+  5. Statistical Analysis:
+  Differential gene expression analysis was conducted using R (deseq) with all default values enabled.
+
+Conclusion:
+Results were similar to the original publication but differed slightly due to quite a few reasons but few of them being:
+- Package versions: Since packages are constantly getting updated it is hard to recreate the exact same results especially where numerical estimations are involved (such as in gsea analysis). There could be small changes in approximation which can lead to different results.
+- Assumptions: While the method section is explicit in all the steps carried out it would be nearly impossible to write each and every step that was carried out. There could have been some assumptions/cut-offs to filter or select data of interest where the exact methodology is not made clear. This is especially true durig statistical manipulations but also during original metadata manipulation.
