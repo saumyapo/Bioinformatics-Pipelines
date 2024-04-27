@@ -1,0 +1,322 @@
+import pandas
+
+sample_csv = pandas.read_csv('sample_sheet.csv', index_col='name')
+CONDITIONS = set(sample_csv['condition'].tolist())
+REPS = set(sample_csv['REPS'].tolist())
+
+wildcard_constraints:
+    condition = '|'.join(CONDITIONS)
+    rep = '|'.join(REPS)
+
+rule all:
+	input:
+		expand("results/{file}", file=["multiqc_report.html", "correlation_matrix.tsv", "correlation_plot.png", "annotated.txt", "motifs/knownResults.html"]),
+		plot = expand("results/RUNX1_{rep}_coverage_plot.png", rep = REPS),
+		plot_profile = expand("results/RUNX1_{rep}_coverage_plot.png", rep = REPS)
+
+
+rule wget_files:
+	output:
+		'samples/{condition}_{rep}.fastq.gz'
+	params:
+		link = lambda wildcards: sample_csv.loc['{}_{}'.format(wildcards.condition, wildcards.rep), 'ftp_link'],
+		renamed = lambda wildcards: 'samples/{}_{}.fastq.gz'.format(wildcards.condition, wildcards.rep)
+	shell:
+		'''
+		wget -O {params.renamed} {params.link}
+		'''
+
+rule bowtie2_build_gencode:
+	input:
+		genome = 'reference/GRCh38.primary_assembly.genome.fa.gz'
+	output:
+		'reference/bowtie_index_GRCh38/human_reference.4.bt2'
+	params:
+		prefix = 'reference/index/human_reference',
+	threads: 16
+	conda:
+		'envs/bowtie2_env.yml'
+	shell:
+		'''
+		bowtie2-build --threads {threads} {input.genome} {params.prefix}
+		'''
+
+rule fastqc:
+	input:
+		fastq = "samples/{condition}_{rep}.fastq.gz"
+	output:
+		html = "results/fastqc/{condition}_{rep}_fastqc.html",
+	params:
+		outdir = 'results/fastqc'
+	threads: 4
+	conda:
+		'envs/fastqc_env.yml'
+	shell:
+		'''
+		fastqc {input.fastq} -o {params.outdir} --threads {threads}
+		'''
+
+rule trimmomatic:
+	input:
+		fastq = "samples/{condition}_{rep}.fastq.gz",
+	output:
+		trimmed = "results/trimmomatic/{condition}_{rep}_trim.fastq.gz"
+	threads: 8
+	conda:
+		'envs/trimmomatic_env.yml'
+	shell:
+		'''
+		trimmomatic SE {input.fastq} {output.trimmed} ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15
+		'''
+
+rule bowtie2_align:
+	input:
+		fastq = "results/trimmomatic/{condition}_{rep}_trim.fastq.gz",
+	output:
+		bam = "results/bam/{condition}_{rep}.bam"
+	threads: 16
+	params:
+		index = "reference/index"
+	conda:
+		'envs/bowtie2_env.yml'
+	shell:
+		"""
+		bowtie2 -x {params.index}/human_reference -U {input.fastq} | samtools view -b > {output.bam}
+		"""
+
+rule samtools_sort:
+	input:
+		bam = "results/bam/{condition}_{rep}.bam"
+	output:
+		sorted_bam = "results/bam/{condition}_{rep}_sorted.bam"
+	conda:
+		'envs/samtools_env.yml'
+	shell:
+		"""
+		samtools sort -@ {threads} -o {output.sorted_bam} {input.bam}
+		"""
+
+rule samtools_idx:
+	input:
+		bam = "results/bam/{condition}_{rep}_sorted.bam"
+	output:
+		bam_index = "results/bam/{condition}_{rep}_sorted.bam.bai"
+	conda:
+		'envs/samtools_env.yml'
+	shell:
+		"""
+		samtools index {input.bam} > {output.bam_index}
+		"""
+
+rule samtools_flagstats:
+	input:
+		bam = "results/bam/{condition}_{rep}_sorted.bam"
+	output:
+		flagstats = "results/flagstats/{condition}_{rep}_flagstats.txt"
+	conda:
+		'envs/samtools_env.yml'
+	shell:
+		"""
+		samtools flagstat {input.bam} > {output.flagstats}
+		"""
+
+rule multiqc:
+	input:
+		flagstats = expand("results/flagstats/{condition}_{rep}_flagstats.txt", condition=CONDITIONS, rep=REPS),
+		fastqc = expand("results/fastqc/{condition}_{rep}_fastqc.html", condition=CONDITIONS, rep=REPS)
+	output:
+		html = "results/multiqc_report.html"
+	params:
+		dir = "results/"
+	conda:
+		'envs/multiqc_env.yml'
+	shell:
+		"""
+		multiqc -o {params.dir} {input.flagstats} {input.fastqc}
+		"""
+
+rule bamCoverage:
+	input:
+		bam = "results/bam/{condition}_{rep}_sorted.bam",
+		bai = "results/bam/{condition}_{rep}_sorted.bam.bai"
+	output:
+		bigwig = "results/bigwig/{condition}_{rep}.bw"
+	threads: 4
+	conda:
+		'envs/deeptools_env.yml'
+	shell:
+		"""
+		bamCoverage -b {input.bam} -o {output.bigwig}
+		"""
+
+rule multiBwSummary:
+	input:
+		bigwigs = expand("results/bigwig/{condition}_{rep}.bw", condition=CONDITIONS, rep=REPS)
+	output:
+		matrix = "results/multiBwSummary_matrix.txt"
+	conda:
+		'envs/deeptools_env.yml'
+	shell:
+		"""
+		multiBigwigSummary bins -b {input.bigwigs} -out {output.matrix}
+		"""
+
+rule plotCorrelation:
+	input:
+		matrix = "results/multiBwSummary_matrix.txt"
+	output:
+		plot = "results/correlation_plot.png",
+		matrix = "results/correlation_matrix.tsv"
+	params:
+		dir = "results/"
+	conda:
+		'envs/deeptools_env.yml'
+	shell:
+		"""
+		plotCorrelation --corData {input.matrix} --corMethod pearson --skipZeros --whatToPlot heatmap --plotFile {output.plot} --outFileCorMatrix {output.matrix} --plotNumbers
+		"""
+
+rule make_tag_dir:
+	input:
+		bam = "results/bam/{condition}_{rep}_sorted.bam"
+	output:
+		directory("results/tagdir/{condition}_{rep}_tagDir")
+	conda:
+		'envs/homer_env.yml'
+	shell:
+		"""
+		makeTagDirectory {output} {input.bam}
+		"""
+
+rule findPeaks:
+	input:
+		control = "results/tagdir/INP_{rep}_tagDir",
+		exp = "results/tagdir/RUNX1_{rep}_tagDir"
+	output:
+		peaks = "results/peaks/{rep}.peaks"
+	conda:
+		'envs/homer_env.yml'
+	shell:
+		"""
+		findPeaks {input.exp} -style factor -o {output} -i {input.control}
+		"""
+
+rule convertPeakFiles:
+	input:
+		peaks = "results/peaks/{rep}.peaks"
+	output:
+		bed = "results/bed/{rep}.bed"
+	conda:
+		'envs/homer_env.yml'
+	shell:
+		"""
+		pos2bed.pl {input} > {output}
+		"""
+
+rule intersect_peaks:
+	input:
+		peaks1 = "results/bed/rep1.bed",
+		peaks2 = "results/bed/rep2.bed"
+	output:
+		intersected = "results/all_intersected.bed"
+	conda:
+		'envs/bedtools_env.yml'
+	shell:
+		"""
+		bedtools intersect -a {input.peaks1} -b {input.peaks2} -f 0.5 -r > {output.intersected}
+		"""
+
+rule filter_blacklist:
+	input:
+		peaks = "results/all_intersected.bed" ,
+		blacklist = "reference/hg38-blacklist.v2.bed"
+	output:
+		filtered_peaks = "results/filtered.bed"
+	conda:
+		'envs/bedtools_env.yml'
+	shell:
+		"""
+		bedtools intersect -a {input.peaks} -b {input.blacklist} -v > {output}
+		"""
+
+rule unzip_gtf:
+	input:
+		gtf = "reference/gencode.v45.primary_assembly.annotation.gtf.gz"
+	output:
+		unzip_gtf = "reference/gencode.v45.primary_assembly.annotation.gtf"
+	shell:
+		"""
+		gunzip {input.gtf}
+		"""
+
+rule annotate_peaks:
+	input:
+		peaks = "results/filtered.bed",
+		gtf = "reference/gencode.v45.primary_assembly.annotation.gtf",
+		genome = "reference/GRCh38.primary_assembly.genome.fa"
+	output:
+		annotated_peaks = "results/annotated.txt"
+	conda:
+		'envs/homer_env.yml'
+	shell:
+		"""
+		annotatePeaks.pl {input.peaks} hg38 -gtf {input.gtf} > {output}
+		"""
+
+rule unzip_genome:
+	input:
+		genome = "reference/GRCh38.primary_assembly.genome.fa.gz"
+	output:
+		unzip_genome = "reference/GRCh38.primary_assembly.genome.fa"
+	shell:
+		"""
+		gunzip {input.genome}
+		"""
+
+rule motifs:
+	input:
+		peaks = "results/filtered.bed",
+		genome = "reference/GRCh38.primary_assembly.genome.fa"
+	output:
+		motif = directory("results/motifs"),
+		html = "results/motifs/knownResults.html"
+	conda:
+		'envs/homer_env.yml'
+	shell:
+		"""
+		findMotifsGenome.pl {input.peaks} {input.genome} {output.motif} -size 200 -mask
+		"""
+
+rule computeMatrix:
+	input:
+		bigwig = "results/bigwig/RUNX1_{rep}.bw",
+		bed = "reference/hg38_genes.bed"
+	output:
+		matrix = "results/RUNX1_{rep}_matrix.gz"
+	params:
+		upstream = "-b 2000",
+		downstream = "-a 2000",
+	conda:
+		'envs/deeptools_env.yml'
+	threads: 4
+	shell:
+		"""
+		computeMatrix scale-regions \
+		-R {input.bed} \
+		-S {input.bigwig} \
+		{params.upstream} {params.downstream} \
+		--outFileName {output}
+		"""
+
+rule plotMatrix:
+	input:
+		matrix = "results/RUNX1_{rep}_matrix.gz"
+	output:
+		plot = "results/RUNX1_{rep}_coverage_plot.png"
+	conda:
+		'envs/deeptools_env.yml'
+	shell:
+		"""
+		plotProfile -m {input.matrix} -o {output}
+		"""
+
