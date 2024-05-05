@@ -1,4 +1,4 @@
-BF528 Individual Project: ATACSeq
+ATACSeq
 ================
 2024-04-25
 
@@ -275,7 +275,7 @@ ATACSeq rep3 Fragment Size Distribution plot generated using ATACseqQC:
 knitr::include_graphics("results/ATACrep3.fragment.size.distribution.jpeg")
 ```
 
-<img src="results/ATACrep3.fragment.size.distribution.jpeg" width="480" />
+<img src="images/ATACrep3.fragment.size.distribution.jpeg" width="480" />
 
 ATACSeq rep4 Fragment Size Distribution plot generated using ATACseqQC:
 
@@ -283,7 +283,7 @@ ATACSeq rep4 Fragment Size Distribution plot generated using ATACseqQC:
 knitr::include_graphics("results/ATACrep4.fragment.size.distribution.jpeg")
 ```
 
-<img src="results/ATACrep4.fragment.size.distribution.jpeg" width="480" />
+<img src="images/ATACrep4.fragment.size.distribution.jpeg" width="480" />
 
 Pie chart of region distribution in HOMER annotated output file:
 
@@ -291,7 +291,7 @@ Pie chart of region distribution in HOMER annotated output file:
 knitr::include_graphics("results/annotated_piechart.jpeg")
 ```
 
-<img src="results/annotated_piechart.jpeg" width="480" />
+<img src="images/annotated_piechart.jpeg" width="480" />
 
 Signal coverage of ATACSeq rep3 sample:
 
@@ -299,7 +299,7 @@ Signal coverage of ATACSeq rep3 sample:
 knitr::include_graphics("results/ATACrep3_coverage_plot.png")
 ```
 
-<img src="results/ATACrep3_coverage_plot.png" width="866" />
+<img src="images/ATACrep3_coverage_plot.png" width="866" />
 
 Signal coverage of ATACSeq rep4 sample:
 
@@ -307,7 +307,7 @@ Signal coverage of ATACSeq rep4 sample:
 knitr::include_graphics("results/ATACrep4_coverage_plot.png")
 ```
 
-<img src="results/ATACrep4_coverage_plot.png" width="866" />
+<img src="images/ATACrep4_coverage_plot.png" width="866" />
 
 Pearson correlation plot between rep3 and rep4 sample:
 
@@ -315,7 +315,7 @@ Pearson correlation plot between rep3 and rep4 sample:
 knitr::include_graphics("results/correlation_plot.png")
 ```
 
-<img src="results/correlation_plot.png" width="1100" />
+<img src="images/correlation_plot.png" width="1100" />
 
 HOMER Motif output:
 
@@ -323,7 +323,7 @@ HOMER Motif output:
 knitr::include_graphics("results/HOMER_motif.png")
 ```
 
-<img src="results/HOMER_motif.png" width="1888" />
+<img src="images/HOMER_motif.png" width="1888" />
 
 GSEA performed on top 3000 genes from HOMER annotated file:
 
@@ -331,7 +331,7 @@ GSEA performed on top 3000 genes from HOMER annotated file:
 knitr::include_graphics("results/functional_annotation_clustering.png")
 ```
 
-<img src="results/functional_annotation_clustering.png" width="1888" />
+<img src="images/functional_annotation_clustering.png" width="1888" />
 
 ### Citations:
 
