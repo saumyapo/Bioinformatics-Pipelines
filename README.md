@@ -13,6 +13,9 @@ Where relevant there is an "images" directory present which holds the images gen
 2. [Snakemake ChIPSeq:](Snakemake/ChIPSeq)
    *  [Methods and Results](Snakemake/ChIPSeq/ChIPSeq_Discussion.Rmd)
    *  [Images obtained from downstream analysis](Snakemake/ChIPSeq/images)
+3. [Snakemake ATACSeq:](Snakemake/ATACSeq)
+   *  [Methods and Results](Snakemake/ATACSeq/ATACSeq_Discussion.md)
+   *  [Images obtained from downstream analysis](Snakemake/ATACSeq/images)
 
 
 ## Nextflow Pipelines
