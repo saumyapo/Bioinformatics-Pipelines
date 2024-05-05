@@ -2,6 +2,10 @@ ATACSeq
 ================
 2024-04-25
 
+Developed by: Saumya Pothukuchi
+
+Reference paper: Buenrostro, J., Giresi, P., Zaba, L. et al. Transposition of native chromatin for fast and sensitive epigenomic profiling of open chromatin, DNA-binding proteins and nucleosome position. Nat Methods 10, 1213–1218 (2013). https://doi.org/10.1038/nmeth.2688 (https://www.nature.com/articles/nmeth.2688)
+
 ## Methods:
 
 Snakemake (version 8.5.2) \[
