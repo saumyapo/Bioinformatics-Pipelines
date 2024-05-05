@@ -1,0 +1,492 @@
+import pandas as pd
+
+wildcard_constraints:
+	rep="rep3|rep4",
+	rp = "R1|R2"
+
+
+CONDITIONS = ['ATAC']
+REPS = ['rep3','rep4']
+RP = ['R1','R2']
+
+rule all:
+    input:
+        expand("results/{file}", file=["multiqc_report.html", "correlation_matrix.tsv", "correlation_plot.png", "motifs/knownResults.html", "annotated_piechart.jpeg"]),
+        plot_profile = expand("results/ATAC{rep}_coverage_plot.png", rep=REPS),
+        atacseqqc = expand("results/ATAC{rep}.fragment.size.distribution.jpeg", rep=REPS)
+
+rule fastqc:
+    input:
+        fastq = "samples/ATAC{rep}_{rp}.fastq.gz"
+    output:
+        html = "results/fastqc/ATAC{rep}_{rp}_fastqc.html",
+        zip = "results/fastqc/ATAC{rep}_{rp}_fastqc.zip"
+    params:
+        outdir = 'results/fastqc'
+    threads: 4
+    conda:
+        'envs/fastqc_env.yml'
+    shell:
+        '''
+        fastqc {input.fastq} -o {params.outdir} --threads {threads}
+        '''
+
+rule trimmomatic:
+    input:
+        R1 = "samples/ATAC{rep}_R1.fastq.gz",
+        R2 = "samples/ATAC{rep}_R2.fastq.gz"
+    output:
+        R1P = "results/trimmomatic/ATAC{rep}_trim_R1P.fastq.gz",
+        R2P = "results/trimmomatic/ATAC{rep}_trim_R2P.fastq.gz",
+        R1UP = "results/trimmomatic/ATAC{rep}_trim_R1UP.fastq.gz",
+        R2UP = "results/trimmomatic/ATAC{rep}_trim_R2UP.fastq.gz"
+    threads: 8
+    conda:
+        'envs/trimmomatic_env.yml'
+    shell:
+        '''
+	trimmomatic PE {input.R1} {input.R2} {output.R1P} {output.R1UP} {output.R2P} {output.R2UP} ILLUMINACLIP:NexteraPE-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
+        '''
+
+rule bowtie2_build_gencode:
+    input:
+        genome = 'reference/GRCh38.primary_assembly.genome.fa.gz'
+    output:
+        'reference/bowtie_index_GRCh38/human_reference.4.bt2'
+    params:
+        prefix = 'reference/bowtie_index_GRCh38/human_reference',
+    threads: 16
+    conda:
+        'envs/bowtie2_env.yml'
+    shell:
+        '''
+        bowtie2-build --threads {threads} {input.genome} {params.prefix}
+        '''
+
+rule bowtie2_align:
+    input:
+        R1 = "results/trimmomatic/ATAC{rep}_trim_R1P.fastq.gz",
+        R2 = "results/trimmomatic/ATAC{rep}_trim_R2P.fastq.gz",
+        index = "reference/bowtie_index_GRCh38/human_reference.4.bt2"
+    output:
+        bam = "results/bam/ATAC{rep}.bam"
+    threads: 16
+    params:
+        index = "reference/bowtie_index_GRCh38"
+    conda:
+        'envs/bowtie2_env.yml'
+    shell:
+        """
+        bowtie2 --threads {threads} -x {params.index}/human_reference -1 {input.R1} -2 {input.R2} -X 2000 | samtools view -b > {output.bam}
+        """
+
+rule samtools_sort:
+    input:
+        bam = "results/bam/ATAC{rep}.bam"
+    output:
+        sorted_bam = "results/bam/ATAC{rep}_sorted.bam"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools sort -@ {threads} -o {output.sorted_bam} {input.bam}
+        """
+
+rule remove_mitochondrial_alignments:
+    input:
+        sorted_bam = "results/bam/ATAC{rep}_sorted.bam"
+    output:
+        sorted_no_chrM_bam = "results/bam/ATAC{rep}_sorted_no_chrM.bam"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools view -h {input.sorted_bam} | awk  '($3 != "chrM" && $3 != "chrUn")'| samtools view -Shb - > {output.sorted_no_chrM_bam}
+        """
+
+rule nochrM_samtools_idx:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_no_chrM.bam"
+    output:
+        bam_index = "results/bam/ATAC{rep}_sorted_no_chrM.bam.bai"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools index {input.bam} > {output.bam_index}
+        """
+
+rule NFR_shifted_bam:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_no_chrM.bam",
+        bai = "results/bam/ATAC{rep}_sorted_no_chrM.bam.bai"
+    output:
+        NFR_shifted_bam = "results/bam/ATAC{rep}_NFR_shifted.bam"
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        alignmentSieve --ATACshift --bam {input.bam} --minFragmentLength 0 --maxFragmentLength 100 --outFile {output.NFR_shifted_bam}
+        """
+
+rule NBR_shifted_bam:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_no_chrM.bam",
+        bai = "results/bam/ATAC{rep}_sorted_no_chrM.bam.bai"
+    output:
+        NBR_shifted_bam = "results/bam/ATAC{rep}_NBR_shifted.bam"
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        alignmentSieve --ATACshift --bam {input.bam} --minFragmentLength 180 --maxFragmentLength 247 --outFile {output.NBR_shifted_bam}
+        """
+
+rule remove_tagmentation_bias:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_no_chrM.bam",
+        bai = "results/bam/ATAC{rep}_sorted_no_chrM.bam.bai"
+    output:
+        shifted_bam = "results/bam/ATAC{rep}_shifted.bam"
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        alignmentSieve --ATACshift --bam {input.bam} --outFile {output.shifted_bam}
+        """
+
+rule atacseqqc:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_shifted.bam",
+        bai = "results/bam/ATAC{rep}_sorted_shifted.bam.bai"
+    output:
+        report = "results/ATAC{rep}.fragment.size.distribution.jpeg"
+    params:
+        script = "atacseqqc.R",
+        output_dir = "results"
+    conda:
+        "envs/atacseqqc_env.yml"
+    shell:
+        """
+        Rscript {params.script}  {input.bam}  {params.output_dir}
+        """
+
+rule shifted_samtools_sort:
+    input:
+        bam = "results/bam/ATAC{rep}_shifted.bam"
+    output:
+        sorted_bam = "results/bam/ATAC{rep}_sorted_shifted.bam"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools sort -@ {threads} -o {output.sorted_bam} {input.bam}
+        """
+
+rule shifted_samtools_idx:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_shifted.bam"
+    output:
+        bam_index = "results/bam/ATAC{rep}_sorted_shifted.bam.bai"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools index {input.bam} > {output.bam_index}
+        """
+
+rule NFR_shifted_samtools_sort:
+    input:
+        bam = "results/bam/ATAC{rep}_NFR_shifted.bam"
+    output:
+        sorted_bam = "results/bam/ATAC{rep}_NFR_sorted_shifted.bam"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools sort -@ {threads} -o {output.sorted_bam} {input.bam}
+        """
+
+rule NFR_shifted_samtools_idx:
+    input:
+        bam = "results/bam/ATAC{rep}_NFR_sorted_shifted.bam"
+    output:
+        bam_index = "results/bam/ATAC{rep}_NFR_sorted_shifted.bam.bai"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools index {input.bam} > {output.bam_index}
+        """
+
+rule NBR_shifted_samtools_sort:
+    input:
+        bam = "results/bam/ATAC{rep}_NBR_shifted.bam"
+    output:
+        sorted_bam = "results/bam/ATAC{rep}_NBR_sorted_shifted.bam"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools sort -@ {threads} -o {output.sorted_bam} {input.bam}
+        """
+
+rule NBR_shifted_samtools_idx:
+    input:
+        bam = "results/bam/ATAC{rep}_NBR_sorted_shifted.bam"
+    output:
+        bam_index = "results/bam/ATAC{rep}_NBR_sorted_shifted.bam.bai"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools index {input.bam} > {output.bam_index}
+        """
+
+rule samtools_flagstats:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_shifted.bam"
+    output:
+        flagstats = "results/flagstats/ATAC{rep}_flagstats.txt"
+    conda:
+        'envs/samtools_env.yml'
+    shell:
+        """
+        samtools flagstat {input.bam} > {output.flagstats}
+        """
+
+rule multiqc:
+    input:
+        flagstats = expand("results/flagstats/ATAC{rep}_flagstats.txt",  rep=REPS),
+        fastqc = expand("results/fastqc/ATAC{rep}_{rp}_fastqc.zip", rep=REPS, rp=RP),
+        #atacseqqc = expand("results/ATAC{rep}_QC_report.html", rep=REPS)
+    output:
+        html = "results/multiqc_report.html"
+    params:
+        dir = "results/"
+    conda:
+        'envs/multiqc_env.yml'
+    shell:
+        """
+        multiqc -o {params.dir} {input.flagstats} {input.fastqc}
+        """
+
+rule bamCoverage:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_shifted.bam",
+        bai = "results/bam/ATAC{rep}_sorted_shifted.bam.bai"
+    output:
+        bigwig = "results/bigwig/ATAC{rep}.bw"
+    threads: 4
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        bamCoverage -b {input.bam} -o {output.bigwig}
+        """
+
+rule NFR_bamCoverage:
+    input:
+        bam = "results/bam/ATAC{rep}_NFR_sorted_shifted.bam",
+        bai = "results/bam/ATAC{rep}_NFR_sorted_shifted.bam.bai"
+    output:
+        bigwig = "results/bigwig/ATAC{rep}_NFR_shifted.bw"
+    threads: 4
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        bamCoverage -b {input.bam} -o {output.bigwig}
+        """
+
+rule NBR_bamCoverage:
+    input:
+        bam = "results/bam/ATAC{rep}_NBR_sorted_shifted.bam",
+        bai = "results/bam/ATAC{rep}_NBR_sorted_shifted.bam.bai"
+    output:
+        bigwig = "results/bigwig/ATAC{rep}_NBR_shifted.bw"
+    threads: 4
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        bamCoverage -b {input.bam} -o {output.bigwig}
+        """
+
+rule multiBwSummary:
+    input:
+        bigwigs = expand("results/bigwig/ATAC{rep}.bw", rep=REPS)
+    output:
+        matrix = "results/multiBwSummary_matrix.txt"
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        multiBigwigSummary bins -b {input.bigwigs} -out {output.matrix}
+        """
+
+rule plotCorrelation:
+        input:
+                matrix = "results/multiBwSummary_matrix.txt"
+        output:
+                plot = "results/correlation_plot.png",
+                matrix = "results/correlation_matrix.tsv"
+        params:
+                dir = "results/"
+        conda:
+                'envs/deeptools_env.yml'
+        shell:
+                """
+                plotCorrelation --corData {input.matrix} --corMethod pearson --skipZeros --whatToPlot heatmap --plotFile {output.plot} --outFileCorMatrix {output.matrix} --plotNumbers
+                """
+
+rule shifted_bed_to_bam:
+    input:
+        bam = "results/bam/ATAC{rep}_sorted_shifted.bam"
+    output:
+        bedpe = "results/ATAC{rep}_sorted_shifted.bed"
+    conda:
+        'envs/macs3_env.yml'
+    shell:
+        """
+        macs3 randsample -i {input.bam} -f BAMPE -p 100 -o {output.bedpe}
+        """
+
+rule peak_calling:
+    input:
+        bam = "results/ATAC{rep}_sorted_shifted.bed"
+    output:
+        peaks = "results/peaks/{rep}_peaks.narrowPeak"
+    conda:
+        'envs/macs3_env.yml'
+    params:
+        outdir = "results/peaks"
+    shell:
+        """
+        macs3 callpeak -t {input.bam} -f BEDPE -n {wildcards.rep} --outdir {params.outdir}
+        """
+
+rule intersect_peaks:
+    input:
+        peaks1 = "results/peaks/rep3_peaks.narrowPeak",
+        peaks2 = "results/peaks/rep4_peaks.narrowPeak"
+    output:
+        intersected = "results/all_intersected.bed"
+    conda:
+        'envs/bedtools_env.yml'
+    shell:
+        """
+        bedtools intersect -a {input.peaks1} -b {input.peaks2} -f 0.5 -r > {output.intersected}
+        """
+
+rule filter_blacklist:
+    input:
+        peaks = "results/all_intersected.bed" ,
+        blacklist = "reference/hg38-blacklist.v2.bed"
+    output:
+        filtered_peaks = "results/filtered.bed"
+    conda:
+        'envs/bedtools_env.yml'
+    shell:
+        """
+        bedtools intersect -a {input.peaks} -b {input.blacklist} -v > {output}
+        """
+
+#rule unzip_gtf:
+#    input:
+#        gtf = "reference/gencode.v45.primary_assembly.annotation.gtf.gz"
+#    output:
+#        unzip_gtf = "reference/gencode.v45.primary_assembly.annotation.gtf"
+#    shell:
+#        """
+#        gunzip {input.gtf}
+#        """
+
+rule annotate_peaks:
+    input:
+        peaks = "results/filtered.bed",
+    output:
+        annotated_peaks = "results/annotated.txt"
+    conda:
+        'envs/homer_env.yml'
+    shell:
+        """
+        annotatePeaks.pl {input.peaks} hg38  > {output}
+        """
+
+#rule unzip_genome:
+#    input:
+#        genome = "reference/GRCh38.primary_assembly.genome.fa.gz"
+#    output:
+#        unzip_genome = "reference/GRCh38.primary_assembly.genome.fa"
+#    shell:
+#        """
+#        gunzip {input.genome}
+#        """
+
+rule motifs:
+    input:
+        peaks = "results/filtered.bed",
+        genome = "reference/GRCh38.primary_assembly.genome.fa"
+    output:
+        motif = directory("results/motifs"),
+        html = "results/motifs/knownResults.html"
+    conda:
+        'envs/homer_env.yml'
+    shell:
+        """
+        findMotifsGenome.pl {input.peaks} {input.genome} {output.motif} -size 200 -mask
+        """
+
+rule computeMatrix:
+    input:
+        bigwig = "results/bigwig/ATAC{rep}.bw",
+        NFR_bigwig = "results/bigwig/ATAC{rep}_NFR_shifted.bw",
+        NBR_bigwig = "results/bigwig/ATAC{rep}_NBR_shifted.bw",
+        bed = "reference/hg38_genes.bed",
+        blacklist = "reference/hg38-blacklist.v2.bed"
+    output:
+        matrix = "results/ATAC{rep}_matrix.gz"
+    params:
+        upstream = "-b 1000",
+        downstream = "-a 1000",
+    conda:
+        'envs/deeptools_env.yml'
+    threads: 4
+    shell:
+        """
+        computeMatrix reference-point \
+        -R {input.bed} \
+        -S {input.bigwig} {input.NFR_bigwig} {input.NBR_bigwig} \
+        --blackListFileName {input.blacklist} \
+        {params.upstream} {params.downstream} \
+        --outFileName {output.matrix}
+        """
+
+rule plotMatrix:
+    input:
+        matrix = "results/ATAC{rep}_matrix.gz"
+    output:
+        plot = "results/ATAC{rep}_coverage_plot.png"
+    conda:
+        'envs/deeptools_env.yml'
+    shell:
+        """
+        plotProfile -m {input.matrix} -o {output} --perGroup --colors gray red blue
+        """
+
+rule piechart:
+    input:
+        annotated = "results/annotated.txt",
+    output:
+        piechart = "results/annotated_piechart.jpeg"
+    params:
+        script = "piechart.R",
+        output_dir = "results/"
+    conda:
+        "envs/atacseqqc_env.yml"
+    shell:
+        """
+        Rscript {params.script}  {input.annotated}  {params.output_dir}
+        """
+
