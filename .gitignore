@@ -1,0 +1,23 @@
+#ignore everything
+*
+
+# allow these at top level
+!*.snake
+!*.gitignore
+!*.png
+!*.Rmd
+!*.MD
+!*.yml
+!*.py
+
+# allow the ymls in envs/
+!/envs/
+!/envs/*.yml
+!/results/
+!/results/.gitkeep
+!/samples/
+!/samples/.gitkeep
+!/refs/
+!/refs/*.png
+!/docs/
+!/docs.*Rmd
