@@ -1,0 +1,7 @@
+channels:
+- conda-forge
+- bioconda
+
+dependencies:
+- homer=4.11
+- samtools=1.19.2
