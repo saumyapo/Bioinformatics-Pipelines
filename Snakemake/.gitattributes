@@ -1,6 +1,0 @@
-Snakemake:
-  type: programming
-  group: Python
-  extensions:
-  - ".snake"
-  - ".Snake" 
