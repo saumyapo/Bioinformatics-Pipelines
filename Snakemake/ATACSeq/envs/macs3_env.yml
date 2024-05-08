@@ -1,0 +1,7 @@
+channels:
+- conda-forge
+- bioconda
+- maximinio
+
+dependencies:
+- macs3=3.0.1

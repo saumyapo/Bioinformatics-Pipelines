@@ -1,0 +1,6 @@
+channels:
+- conda-forge
+- bioconda
+
+dependencies:
+- bioconductor-atacseqqc=1.26.0
