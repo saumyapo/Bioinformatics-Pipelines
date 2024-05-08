@@ -2,10 +2,11 @@
 Bioinformatics pipelines developed either using Nextflow or Snakemake.
 
 ## Snakemake Pipelines
-The `Snakemake` directory has different Snakemake pipelines developed for different data types. 
-
-Each directory contains the Snakemake file for that respective workflow and also a Discussion.Rmd which contains information about what references and methods were used to recreate the results via the pipeline and what the conclusions/learning outcomes were. The directory also includes other scripts written outside of Snakemake (using either Python or R) which were used for further analysis of the data.
-Where relevant there is an "images" directory present which holds the images generated during downstream analysis of the data.
+- The `Snakemake` directory has different Snakemake pipelines developed for different data types. 
+- Each directory contains the Snakemake file for that respective workflow and also a Discussion.Rmd which contains information about what references and methods were used to recreate the results via the pipeline and what the conclusions/learning outcomes were.
+- The directory also includes other scripts written outside of Snakemake (using either Python or R) which were used for further analysis of the data.
+- Where relevant there is an "images" directory present which holds the images generated during downstream analysis of the data.
+- The conda env used to run each workflow is present and additionally there is an `envs` repository with the yml used for each tool during analysis.
 
 ### Links to Snakemake files
 1. [Snakemake RNASeq:](Snakemake/RNASeq)
