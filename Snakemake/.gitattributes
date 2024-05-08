@@ -1,2 +1,6 @@
-* linguist-vendored
-*.snake linguist-vendored=false
+Snakemake:
+  type: programming
+  group: Python
+  extensions:
+  - ".snake"
+  - ".Snake" 
