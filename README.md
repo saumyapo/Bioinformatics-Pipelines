@@ -1,3 +1,5 @@
+[![Built With](https://img.shields.io/badge/Built%20With-Snakemake-v8.5.2-blue.svg)](https://snakemake.readthedocs.io/) 
+
 # Bioinformatics-Pipelines
 Bioinformatics pipelines developed either using Nextflow or Snakemake.
 
